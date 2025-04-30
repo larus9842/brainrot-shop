@@ -28,6 +28,15 @@
             const title = card.querySelector('h2').innerText.trim();
             const color = card.querySelector('select').value.trim();
             const img = card.querySelector('img').src;
+            const audioFile = btn.dataset.sound;
+            if (audioFile) {
+                const sound = new Audio(audioFile);
+                sound.play().catch(e => {
+                    // fallback silenzioso in caso di errore (es: autoplay non consentito)
+                    console.warn('Audio non riprodotto:', e);
+                });
+            }
+
 
             if (color === 'Seleziona colore') {
                 alert('Per favore seleziona un colore!');
