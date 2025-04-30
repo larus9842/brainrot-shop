@@ -99,5 +99,30 @@
 
     <script src="script.js?v=4"></script>
 
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Applica solo se siamo su mobile
+            if (window.innerWidth <= 600) {
+                const products = document.querySelectorAll('.product');
+
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+                            entry.target.classList.add('active');
+                        } else {
+                            entry.target.classList.remove('active');
+                        }
+                    });
+                }, {
+                    root: null,
+                    threshold: 0.6
+                });
+
+                products.forEach(p => observer.observe(p));
+            }
+        });
+    </script>
+
+
 </body>
 </html>
