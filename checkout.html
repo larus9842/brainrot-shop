@@ -169,9 +169,10 @@
 
                 // 🔹 Inizializza PayPal solo una volta
                 if (!paypalInitialized) {
-                    initPaypal(totalPrice.toFixed(2));
+                    initPaypal(); // senza parametro ora
                     paypalInitialized = true;
                 }
+
             }
 
             itemsBox.addEventListener('click', e => {
@@ -186,22 +187,38 @@
                 renderCheckout();
             });
 
-            function initPaypal(total) {
+            function initPaypal() {
                 paypal.Buttons({
                     style: { layout: 'vertical', color: 'gold' },
-                    createOrder(_, act) {
-                        return act.order.create({
-                            purchase_units: [{ amount: { value: total, currency_code: 'EUR' } }]
+                    createOrder(_, actions) {
+                        const cart = readCart();
+                        const qty = cart.reduce((s, it) => s + it.quantity, 0);
+                        const total = calcTotal(qty).toFixed(2);
+
+                        // Crea descrizione dinamica
+                        const descrizione = cart.map(item =>
+                            `${item.quantity}x ${item.title} (${item.color})`
+                        ).join(', ');
+
+                        return actions.order.create({
+                            purchase_units: [{
+                                amount: {
+                                    value: total,
+                                    currency_code: 'EUR'
+                                },
+                                description: `Ordine Brainrot: ${descrizione}`
+                            }]
                         });
                     },
-                    onApprove(_, act) {
-                        return act.order.capture().then(() => {
+                    onApprove(_, actions) {
+                        return actions.order.capture().then(() => {
                             localStorage.removeItem(CART_KEY);
                             window.location.href = 'thankyou.html';
                         });
                     }
                 }).render('#paypal-btn');
             }
+
 
             renderCheckout();
         });
