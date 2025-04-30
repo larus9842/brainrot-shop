@@ -1,0 +1,210 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Checkout - Italian Brainrot Shop</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        main {
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: calc(100vh - 100px);
+        }
+
+        h1 {
+            font-size: 20px;
+            margin: 10px 0 14px;
+        }
+
+        .cart-item {
+            display: flex;
+            align-items: center;
+            border: 2px solid black;
+            padding: 15px;
+            margin-bottom: 20px;
+            width: 320px;
+            justify-content: space-between;
+        }
+
+            .cart-item img {
+                width: 60px;
+                height: 60px;
+                object-fit: contain;
+                margin-right: 10px;
+            }
+
+        .cart-item-details {
+            font-size: 10px;
+            flex-grow: 1;
+            text-align: left;
+        }
+
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+            .quantity-controls button {
+                font-family: 'Press Start 2P', cursive;
+                font-size: 10px;
+                background: white;
+                border: 2px solid black;
+                padding: 3px 6px;
+                cursor: pointer;
+            }
+
+        .checkout-summary {
+            margin-top: 20px;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        #paypal-btn {
+            margin-top: 30px;
+        }
+
+        .checkout-summary span,
+        .checkout-summary strong {
+            margin-bottom: 10px;
+            line-height: 1.8em;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="index.html" class="site-title">Italian Brainrot Shop</a>
+        <div class="cart" id="cart-button">🛒 Carrello (<span id="cart-count">0</span>)</div>
+    </header>
+
+    <main>
+        <h1>Checkout</h1>
+        <div id="cart-items"></div>
+        <div class="checkout-summary" id="total-summary"></div>
+        <div id="paypal-btn" style="display: none;"></div>
+    </main>
+
+    <!-- SDK PayPal -->
+    <script src="https://www.paypal.com/sdk/js?client-id=AY6tJ9w6kLEe0PAbz_1IOiIoXYN3g8DGz_UfiUmewJ1eH8Dxg5MMsH_iENfCxBXzTtGKLbfnYY0w7BUq&currency=EUR"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const CART_KEY = 'brainrot_cart_v1';
+            const itemsBox = document.getElementById('cart-items');
+            const summaryBox = document.getElementById('total-summary');
+            const payDiv = document.getElementById('paypal-btn');
+            const badge = document.getElementById('cart-count');
+            let paypalInitialized = false;
+
+            const readCart = () => JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+            const writeCart = c => localStorage.setItem(CART_KEY, JSON.stringify(c));
+
+            function calcTotal(q) {
+                if (q <= 0) return 0;
+                if (q === 1) return 14.90;
+                if (q === 2) return 23.90;
+                if (q === 3) return 29.90;
+                if (q === 4) return 34.90;
+                return 34.90 + (q - 4) * 7.00;
+            }
+
+            const setBadge = cart =>
+                badge.textContent = cart.reduce((s, it) => s + it.quantity, 0);
+
+            function renderCheckout() {
+                const cart = readCart();
+                itemsBox.innerHTML = '';
+                summaryBox.innerHTML = '';
+                setBadge(cart);
+
+                if (!cart.length) {
+                    itemsBox.innerHTML = '<p>Il carrello è vuoto.</p>';
+                    payDiv.style.display = 'none';
+                    return;
+                }
+
+                payDiv.style.display = 'block';
+
+                let totalQty = 0;
+                cart.forEach((it, i) => {
+                    totalQty += it.quantity;
+                    itemsBox.insertAdjacentHTML('beforeend', `
+                <div class="cart-item">
+                  <img src="${it.image}" alt="">
+                  <div class="cart-item-details">
+                    <strong>${it.title}</strong><br><small>${it.color}</small>
+                  </div>
+                  <div class="quantity-controls">
+                    <button data-act="minus" data-idx="${i}">-</button>
+                    ${it.quantity}
+                    <button data-act="plus"  data-idx="${i}">+</button>
+                  </div>
+                </div>`);
+                });
+
+                const totalPrice = calcTotal(totalQty);
+                const full = 14.90 * totalQty + 6.70;
+                const save = (full - totalPrice).toFixed(2);
+                const savePct = Math.round((save / full) * 100);
+
+                if (totalQty === 1) {
+                    summaryBox.innerHTML = `
+                <strong>Totale articoli:</strong> 1<br>
+                <strong>Importo da pagare:</strong> €${totalPrice.toFixed(2)}`;
+                } else {
+                    summaryBox.innerHTML = `
+                <strong>Totale articoli:</strong> ${totalQty}<br>
+                <span style="font-size:10px;">
+                  Prezzo originale: <del>€${full.toFixed(2)}</del>
+                </span><br>
+                <strong>Ora paghi:</strong> €${totalPrice.toFixed(2)}<br>
+                <span style="color:green;font-size:10px;">
+                  Risparmi €${save} (${savePct}%)
+                </span>`;
+                }
+
+                // 🔹 Inizializza PayPal solo una volta
+                if (!paypalInitialized) {
+                    initPaypal(totalPrice.toFixed(2));
+                    paypalInitialized = true;
+                }
+            }
+
+            itemsBox.addEventListener('click', e => {
+                if (!e.target.matches('button[data-act]')) return;
+                const idx = +e.target.dataset.idx;
+                const act = e.target.dataset.act;
+                const cart = readCart();
+
+                act === 'plus' ? cart[idx].quantity++ : cart[idx].quantity--;
+                if (cart[idx].quantity <= 0) cart.splice(idx, 1);
+                writeCart(cart);
+                renderCheckout();
+            });
+
+            function initPaypal(total) {
+                paypal.Buttons({
+                    style: { layout: 'vertical', color: 'gold' },
+                    createOrder(_, act) {
+                        return act.order.create({
+                            purchase_units: [{ amount: { value: total, currency_code: 'EUR' } }]
+                        });
+                    },
+                    onApprove(_, act) {
+                        return act.order.capture().then(() => {
+                            localStorage.removeItem(CART_KEY);
+                            window.location.href = 'thankyou.html';
+                        });
+                    }
+                }).render('#paypal-btn');
+            }
+
+            renderCheckout();
+        });
+    </script>
+</body>
+</html>
